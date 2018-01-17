@@ -33,8 +33,11 @@ import qualified Numeric as N
 -- The custom list type
 data List t =
   Nil
+  -- cons Cons t (List t) constructor
   | t :. List t
   deriving (Eq, Ord)
+-- (:.) :: t -> List t -> List t
+-- t is the head, List t is the tail
 
 -- Right-associative
 infixr 5 :.
@@ -76,7 +79,12 @@ headOr ::
   -> List a
   -> a
 headOr =
-  error "todo: Course.List#headOr"
+  \a list -> case list of
+          Nil -> a
+          h:._ -> h
+
+-- headOr d Nil = d
+-- headOr _ h:._ = h
 
 -- | The product of the elements of a list.
 --
@@ -91,8 +99,18 @@ headOr =
 product ::
   List Int
   -> Int
-product =
-  error "todo: Course.List#product"
+-- product =
+--   \d list -> case list of
+--               Nil -> 1
+--               (h:.t) -> h * product t
+
+product Nil = 1
+product (h:.t) = h* product t
+
+
+
+-- fold left == reduce in javascript
+
 
 -- | Sum the elements of the list.
 --
@@ -106,9 +124,10 @@ product =
 sum ::
   List Int
   -> Int
-sum =
-  error "todo: Course.List#sum"
+sum Nil = 0
+sum (h:.t) = h + sum t
 
+-- sum = foldLeft (+) 0 list
 -- | Return the length of the list.
 --
 -- >>> length (1 :. 2 :. 3 :. Nil)
@@ -118,8 +137,21 @@ sum =
 length ::
   List a
   -> Int
+-- length Nil = 0
+-- length (_:t) = 1 + length tail
+
 length =
-  error "todo: Course.List#length"
+  -- \list -> foldLeft (\r _ -> r + 1) 0 list
+  -- \list -> foldLeft (\r -> const (r + 1)) 0 list
+  \list -> foldLeft (\r -> \_ -> (r +1 )) 0 list
+
+
+-- x :: a
+-- g :: a -> b
+-- f :: b -> c
+-- function composition
+-- (...) :: (b -> c) -> (a -> b) -> (a -> c)
+-- (...) = (.) =
 
 -- | Map the given function on each element of the list.
 --
@@ -133,8 +165,14 @@ map ::
   (a -> b)
   -> List a
   -> List b
-map =
-  error "todo: Course.List#map"
+
+map _ Nil = Nil
+map f (h:.t) = f h :. map f t
+-- f :: a -> b
+-- h :: a
+-- t :: List a
+-- map f t :: List b
+
 
 -- | Return elements satisfying the given predicate.
 --
@@ -150,8 +188,11 @@ filter ::
   (a -> Bool)
   -> List a
   -> List a
-filter =
-  error "todo: Course.List#filter"
+
+filter _ Nil = Nil
+filter f (h:.t) =
+  let z = filter f t
+  in if f h then h:. z else z
 
 -- | Append two lists to a new list.
 --
@@ -169,8 +210,10 @@ filter =
   List a
   -> List a
   -> List a
-(++) =
-  error "todo: Course.List#(++)"
+(++) Nil x = x
+-- (++) (h:.t) x = h :. (t ++ x)
+(++) list1 list2 = foldRight (:.) list2 list1
+-- (++)
 
 infixr 5 ++
 
@@ -187,8 +230,10 @@ infixr 5 ++
 flatten ::
   List (List a)
   -> List a
-flatten =
-  error "todo: Course.List#flatten"
+-- flatten Nil = Nil
+-- flatten (h:.t) = h ++ flatten t
+flatten = foldRight (++) Nil
+  -- error "todo: Course.List#flatten"
 
 -- | Map a function then flatten to a list.
 --
@@ -204,8 +249,10 @@ flatMap ::
   (a -> List b)
   -> List a
   -> List b
-flatMap =
-  error "todo: Course.List#flatMap"
+flatMap _ Nil = Nil
+-- flatMap f list = flatten (map f list)
+flapMap f list = (foldRight (++) Nil (map f list))
+-- flatMap f (h:.t) = f h ++ flatMap f t
 
 -- | Flatten a list of lists to a list (again).
 -- HOWEVER, this time use the /flatMap/ function that you just wrote.
@@ -215,11 +262,11 @@ flattenAgain ::
   List (List a)
   -> List a
 flattenAgain =
-  error "todo: Course.List#flattenAgain"
+  flatMap id
 
 -- | Convert a list of optional values to an optional list of values.
 --
--- * If the list contains all `Full` values, 
+-- * If the list contains all `Full` values,
 -- then return `Full` list of values.
 --
 -- * If the list contains one or more `Empty` values,
@@ -242,8 +289,10 @@ flattenAgain =
 seqOptional ::
   List (Optional a)
   -> Optional (List a)
-seqOptional =
-  error "todo: Course.List#seqOptional"
+-- seqOptional Nil = Full Nil
+-- seqOptional (h:.t) = bindOptional (\a -> mapOptional (\b -> a:.b) (seqOptional t)) h
+-- seqOptional (h:.t) = twiceOptional (:.) h (seqOptional t)
+seqOptional = foldRight (twiceOptional (:.)) (Full Nil)
 
 -- | Find the first element in the list matching the predicate.
 --
