@@ -314,8 +314,8 @@ find ::
   (a -> Bool)
   -> List a
   -> Optional a
-find =
-  error "todo: Course.List#find"
+find p = foldRight (\a b -> bool b (Full a)(p a)) Empty
+
 
 -- | Determine if the length of the given list is greater than 4.
 --
@@ -333,8 +333,7 @@ find =
 lengthGT4 ::
   List a
   -> Bool
-lengthGT4 =
-  error "todo: Course.List#lengthGT4"
+lengthGT4 x = length (take 5 x) > 4
 
 -- | Reverse a list.
 --
@@ -351,7 +350,8 @@ reverse ::
   List a
   -> List a
 reverse =
-  error "todo: Course.List#reverse"
+  foldLeft (flip (:.)) Nil
+
 
 -- | Produce an infinite `List` that seeds with the given value at its head,
 -- then runs the given function for subsequent elements
