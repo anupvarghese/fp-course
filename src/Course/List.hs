@@ -752,3 +752,10 @@ instance P.Monad List where
     flip flatMap
   return =
     (:. Nil)
+
+
+-- function composition is like a map
+
+
+-- map :: (a -> b) -> List a -> List b'
+-- (.) :: (a -> b) -> (t -> a) -> (t -> b)

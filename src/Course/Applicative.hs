@@ -3,11 +3,24 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE RebindableSyntax #-}
 
-module Course.Applicative where
+module Course.Applicative(
+  Applicative(..)
+, lift2
+, lift3
+, lift4
+, (*>)
+, (<*)
+, sequence
+, replicateA
+, filtering
+, return
+, fail
+, (>>)
+) where
 
 import Course.Core
 import Course.ExactlyOne
-import Course.Functor
+import Course.Functor hiding ((<$>))
 import Course.List
 import Course.Optional
 import qualified Prelude as P(fmap, return, (>>=))
@@ -18,15 +31,11 @@ import qualified Prelude as P(fmap, return, (>>=))
 -- * The law of associative composition
 --   `∀a b c. ((.) <$> a <*> b <*> c) ≅ (a <*> (b <*> c))`
 --
--- * The law of identity
+-- * The law of left identity
 --   `∀x. pure id <*> x ≅ x`
 --
--- * The law of homomorphism
---   `∀f x. pure f <*> pure x ≅ pure (f x)`
---
--- * The law of composition
---   `∀u v w. pure (.) <*> u <*> v <*> w ≅ u <*> (v <*> w)`
-
+-- * The law of right identity
+--   `∀x. x <*> pure id ≅ x`
 class Functor f => Applicative f where
   pure ::
     a -> f a
@@ -36,6 +45,24 @@ class Functor f => Applicative f where
     -> f b
 
 infixl 4 <*>
+
+-- | Witness that all things with (<*>) and pure also have (<$>).
+--
+-- >>> (+1) <$> (ExactlyOne 2)
+-- ExactlyOne 3
+--
+-- >>> (+1) <$> Nil
+-- []
+--
+-- >>> (+1) <$> (1 :. 2 :. 3 :. Nil)
+-- [2,3,4]
+(<$>) ::
+  Applicative f =>
+  (a -> b)
+  -> f a
+  -> f b
+(<$>) =
+  (<*>) . pure
 
 -- | Insert into ExactlyOne.
 --
@@ -48,13 +75,13 @@ instance Applicative ExactlyOne where
     a
     -> ExactlyOne a
   pure =
-    error "todo: Course.Applicative pure#instance ExactlyOne"
-  (<*>) :: 
+    ExactlyOne
+  (<*>) ::
     ExactlyOne (a -> b)
     -> ExactlyOne a
     -> ExactlyOne b
-  (<*>) =
-    error "todo: Course.Applicative (<*>)#instance ExactlyOne"
+  ExactlyOne f <*> ExactlyOne a =
+    ExactlyOne (f a)
 
 -- | Insert into a List.
 --
@@ -67,31 +94,13 @@ instance Applicative List where
     a
     -> List a
   pure =
-    error "todo: Course.Applicative pure#instance List"
+    \a -> a :. Nil
   (<*>) ::
     List (a -> b)
     -> List a
     -> List b
-  (<*>) =
-    error "todo: Course.Apply (<*>)#instance List"
-
--- | Witness that all things with (<*>) and pure also have (<$>).
---
--- >>> (+1) <$$> (ExactlyOne 2)
--- ExactlyOne 3
---
--- >>> (+1) <$$> Nil
--- []
---
--- >>> (+1) <$$> (1 :. 2 :. 3 :. Nil)
--- [2,3,4]
-(<$$>) ::
-  Applicative f =>
-  (a -> b)
-  -> f a
-  -> f b
-(<$$>) =
-  error "todo: Course.Applicative#(<$$>)"
+  f <*> a =
+    flatMap (`map` a) f
 
 -- | Insert into an Optional.
 --
@@ -110,13 +119,13 @@ instance Applicative Optional where
     a
     -> Optional a
   pure =
-    error "todo: Course.Applicative pure#instance Optional"
+    Full
   (<*>) ::
     Optional (a -> b)
     -> Optional a
     -> Optional b
-  (<*>) =
-    error "todo: Course.Apply (<*>)#instance Optional"
+  f <*> a =
+    bindOptional (`mapOptional` a) f
 
 -- | Insert into a constant function.
 --
@@ -139,16 +148,15 @@ instance Applicative Optional where
 instance Applicative ((->) t) where
   pure ::
     a
-    -> ((->) t a)
+    -> (t -> a)
   pure =
-    error "todo: Course.Applicative pure#((->) t)"
+   const
   (<*>) ::
-    ((->) t (a -> b))
-    -> ((->) t a)
-    -> ((->) t b)
-  (<*>) =
-    error "todo: Course.Apply (<*>)#instance ((->) t)"
-
+    (t -> a -> b)
+    -> (t -> a)
+    -> (t -> b)
+  f1 <*> f2 =
+    \t -> f1 t (f2 t)
 
 -- | Apply a binary function in the environment.
 --
@@ -171,12 +179,12 @@ instance Applicative ((->) t) where
 -- 18
 lift2 ::
   Applicative f =>
-  (a -> b -> c)
+  (a -> (b -> c))
   -> f a
   -> f b
   -> f c
-lift2 =
-  error "todo: Course.Applicative#lift2"
+lift2 fa2b2c a b =
+  fa2b2c <$> a <*> b
 
 -- | Apply a ternary function in the environment.
 --
@@ -202,13 +210,14 @@ lift2 =
 -- 138
 lift3 ::
   Applicative f =>
-  (a -> b -> c -> d)
+  (a -> (b -> c -> d))
   -> f a
   -> f b
   -> f c
   -> f d
-lift3 =
-  error "todo: Course.Applicative#lift3"
+lift3 fa2b2c2d a b c =
+  lift2 fa2b2c2d a b <*> c
+  -- fa2b2c2d <$> a <*> b <*> c
 
 -- | Apply a quaternary function in the environment.
 --
@@ -240,8 +249,8 @@ lift4 ::
   -> f c
   -> f d
   -> f e
-lift4 =
-  error "todo: Course.Applicative#lift4"
+lift4 f a b c d =
+  lift3 f a b c <*> d
 
 -- | Apply, discarding the value of the first argument.
 -- Pronounced, right apply.
@@ -266,8 +275,7 @@ lift4 =
   f a
   -> f b
   -> f b
-(*>) =
-  error "todo: Course.Applicative#(*>)"
+(*>) = lift2 (const id)
 
 -- | Apply, discarding the value of the second argument.
 -- Pronounced, left apply.
@@ -293,7 +301,7 @@ lift4 =
   -> f a
   -> f b
 (<*) =
-  error "todo: Course.Applicative#(<*)"
+  lift2 const
 
 -- | Sequences a list of structures to a structure of list.
 --
@@ -315,8 +323,8 @@ sequence ::
   Applicative f =>
   List (f a)
   -> f (List a)
-sequence =
-  error "todo: Course.Applicative#sequence"
+-- sequence (h:.t) = lift2 (:.) h (sequence t)
+sequence = foldRight (lift2 (:.)) (pure Nil)
 
 -- | Replicate an effect a given number of times.
 --
@@ -339,8 +347,8 @@ replicateA ::
   Int
   -> f a
   -> f (List a)
-replicateA =
-  error "todo: Course.Applicative#replicateA"
+replicateA n =
+  error "todo: Course.FileIO#main"
 
 -- | Filter a list with a predicate that produces an effect.
 --
@@ -367,8 +375,8 @@ filtering ::
   (a -> f Bool)
   -> List a
   -> f (List a)
-filtering =
-  error "todo: Course.Applicative#filtering"
+filtering p =
+  error "todo: Course.FileIO#main"
 
 -----------------------
 -- SUPPORT LIBRARIES --
